@@ -8,20 +8,9 @@ from decimal import Decimal
 
 class Customer(models.Model):
     """Customer model"""
-    name = models.CharField(max_length=255)
-    email = models.EmailField(unique=True)
-    
-    # Phone validator for formats like +1234567890 or 123-456-7890
-    phone_regex = RegexValidator(
-        regex=r'^\+?\d{1,3}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}$',
-        message="Phone number must be in format: '+999999999' or '123-456-7890'"
-    )
-    phone = models.CharField(
-        validators=[phone_regex], 
-        max_length=17, 
-        blank=True, 
-        null=True
-    )
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone = models.CharField(max_length=15)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -30,7 +19,7 @@ class Customer(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.name} ({self.email})"
+        return self.name
 
 
 class Product(models.Model):
