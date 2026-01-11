@@ -6,6 +6,8 @@ This module contains all scheduled tasks for the CRM system.
 from datetime import datetime
 import requests
 import json
+from gql import gql, Client
+from gql.transport.requests import RequestsHTTPTransport
 
 
 def log_crm_heartbeat():
@@ -20,36 +22,27 @@ def log_crm_heartbeat():
     # Optional: Query GraphQL endpoint to verify it's responsive
     graphql_status = ""
     try:
-        query = {
-            "query": """
-                query {
-                    hello
-                }
-            """
-        }
+        # Define the GraphQL query
+        query = gql("""
+            query {
+                hello
+            }
+        """)
         
-        response = requests.post(
-            graphql_url,
-            json=query,
-            headers={'Content-Type': 'application/json'},
-            timeout=5
-        )
+        # Setup GraphQL client
+        transport = RequestsHTTPTransport(url=graphql_url, verify=True, retries=3)
+        client = Client(transport=transport, fetch_schema_from_transport=False)
         
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('data', {}).get('hello'):
-                graphql_status = " (GraphQL: OK)"
-            else:
-                graphql_status = " (GraphQL: No response)"
+        # Execute query
+        result = client.execute(query)
+        
+        if result and result.get('hello'):
+            graphql_status = " (GraphQL: OK)"
         else:
-            graphql_status = f" (GraphQL: HTTP {response.status_code})"
+            graphql_status = " (GraphQL: No response)"
             
-    except requests.exceptions.Timeout:
-        graphql_status = " (GraphQL: Timeout)"
-    except requests.exceptions.ConnectionError:
-        graphql_status = " (GraphQL: Connection failed)"
     except Exception as e:
-        graphql_status = f" (GraphQL: {str(e)[:30]})"
+        graphql_status = f" (GraphQL: Error - {str(e)[:30]})"
     
     # Create log message
     message = f"{timestamp} CRM is alive{graphql_status}\n"
@@ -74,9 +67,9 @@ def update_low_stock():
     graphql_url = "http://localhost:8000/graphql"
     log_file_path = '/tmp/low_stock_updates_log.txt'
     
-    # Define the GraphQL mutation
-    mutation = {
-        "query": """
+    try:
+        # Define the GraphQL mutation
+        mutation = gql("""
             mutation {
                 updateLowStockProducts {
                     success
@@ -88,17 +81,14 @@ def update_low_stock():
                     }
                 }
             }
-        """
-    }
-    
-    try:
+        """)
+        
+        # Setup GraphQL client
+        transport = RequestsHTTPTransport(url=graphql_url, verify=True, retries=3)
+        client = Client(transport=transport, fetch_schema_from_transport=False)
+        
         # Execute the mutation
-        response = requests.post(
-            graphql_url,
-            json=mutation,
-            headers={'Content-Type': 'application/json'},
-            timeout=10
-        )
+        result = client.execute(mutation)
         
         # Log the start of the update process
         with open(log_file_path, 'a') as log_file:
@@ -106,13 +96,12 @@ def update_low_stock():
             log_file.write(f"{timestamp} - Low Stock Update Started\n")
             log_file.write(f"{'='*60}\n")
         
-        if response.status_code == 200:
-            data = response.json()
-            result = data.get('data', {}).get('updateLowStockProducts', {})
+        if result:
+            update_result = result.get('updateLowStockProducts', {})
             
-            success = result.get('success', False)
-            message = result.get('message', 'No message returned')
-            products = result.get('products', [])
+            success = update_result.get('success', False)
+            message = update_result.get('message', 'No message returned')
+            products = update_result.get('products', [])
             
             with open(log_file_path, 'a') as log_file:
                 log_file.write(f"Status: {'SUCCESS' if success else 'FAILED'}\n")
@@ -137,25 +126,6 @@ def update_low_stock():
             
             print(f"Low stock update completed: {len(products)} products updated")
             
-        else:
-            error_msg = f"GraphQL request failed with status {response.status_code}"
-            with open(log_file_path, 'a') as log_file:
-                log_file.write(f"ERROR: {error_msg}\n")
-                log_file.write(f"Response: {response.text[:200]}\n")
-            print(error_msg)
-            
-    except requests.exceptions.Timeout:
-        error_msg = "Request timeout while connecting to GraphQL endpoint"
-        with open(log_file_path, 'a') as log_file:
-            log_file.write(f"{timestamp} - ERROR: {error_msg}\n")
-        print(error_msg)
-        
-    except requests.exceptions.ConnectionError:
-        error_msg = "Connection error: Could not reach GraphQL endpoint"
-        with open(log_file_path, 'a') as log_file:
-            log_file.write(f"{timestamp} - ERROR: {error_msg}\n")
-        print(error_msg)
-        
     except Exception as e:
         error_msg = f"Unexpected error: {str(e)}"
         with open(log_file_path, 'a') as log_file:
