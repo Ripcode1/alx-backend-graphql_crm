@@ -1,0 +1,21 @@
+# Django Framework
+Django>=4.2.0,<5.0.0
+
+# GraphQL Support
+graphene>=3.3
+graphene-django>=3.2.0
+
+# Cron Job Management
+django-crontab>=0.7.1
+
+# GraphQL Client (for send_order_reminders.py)
+gql[all]>=3.5.0
+
+# HTTP Requests
+requests>=2.31.0
+
+# Timezone Support
+pytz>=2024.1
+
+# Additional useful packages
+python-dateutil>=2.8.2
